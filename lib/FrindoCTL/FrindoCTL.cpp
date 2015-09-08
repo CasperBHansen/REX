@@ -8,7 +8,6 @@ int speedB = 9;          // pin 9 sets the speed of motor B (this is a PWM outpu
 int dirA = 8;            // pin 8 sets the direction of motor A
 int dirB = 7;            // pin 7 sets the direction of motor B
 
-
 // define the direction of motor rotation - this allows you change the  direction without effecting the hardware
 int fwdA  =  HIGH;       // this sketch assumes that motor A is the right-hand motor of your robot (looking from the back of your robot)
 int revA  =  LOW;        // (note this should ALWAYS be opposite the fwdA)
@@ -46,8 +45,18 @@ const int vel_2_volt(const float v)
     return (v >= 0) ? v * HIGH : v * LOW;
 }
 
+float raw2cm(int raw)
+{
+    return raw * 2.0;
+}
+
 FrindoCTL::FrindoCTL()                           // sets up the pinModes for the pins we are using
 {
+    // initialize sensors
+    front = new Sensor(0, &raw2cm);
+    right = new Sensor(1, &raw2cm);
+    left  = new Sensor(2, &raw2cm);
+
     // initialize internal
     wheel = Vector();
     velocity = 0.0;
@@ -57,6 +66,14 @@ FrindoCTL::FrindoCTL()                           // sets up the pinModes for the
     pinMode(dirB, OUTPUT);
     pinMode(speedA, OUTPUT);
     pinMode(speedB, OUTPUT);
+}
+
+FrindoCTL::~FrindoCTL()
+{
+    // deallocate sensors
+    delete front;
+    delete right;
+    delete left;
 }
 
 // low-level API
@@ -89,16 +106,19 @@ void FrindoCTL::stop(void)
     velocity = 0.0f;
 }
 
-void FrindoCTL::read(void)
+float FrindoCTL::readFront(void)
 {
-    sensors.front   = analogRead(0);
-    sensors.right   = analogRead(1);
-    sensors.left    = analogRead(2);
+    return front->read();
+}
 
-    // unused
-    sensors.reserved_0  = analogRead(3);
-    sensors.reserved_1  = analogRead(4);
-    sensors.reserved_2  = analogRead(5);
+float FrindoCTL::readLeft(void)
+{
+    return left->read();
+}
+
+float FrindoCTL::readRight(void)
+{
+    return right->read();
 }
 
 void FrindoCTL::setSpeed(const float s)
