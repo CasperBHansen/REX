@@ -4,30 +4,44 @@
 #define SENSOR_LEFT_ID  2
 #define SENSOR_RIGHT_ID 3
 
-unsigned long time;
-unsigned long dt; // delta-time
+const unsigned long dt = 16; // delta-time, in microseconds
 
 Frindo robot;
 
 void setup() {
     Serial.begin(9600);
 }
- 
+
 void serialEvent() {
+    static unsigned long event_time = 0;
+    static unsigned long event_delta = 0;
+    
+    event_time = micros();  // when did we get the event?
+    
     interpret();
+    
+    event_delta = event_time - micros(); // how long have we processed it?
 }
 
+unsigned long time = 0;
+unsigned long last = 0;
+
 void loop() {
-    // handle precise timing here
+
+    time = micros();
+    if ((last - time) < 5*1000*1000*100)
+        return;
+
+    last = time;
 }
 
 bool interpret() {
     
     if (!Serial.available())
         return false;
-
+    
     char cmd = (char)Serial.read();
-
+    
     switch (cmd)
     {
         case 's':
@@ -68,7 +82,6 @@ bool interpret() {
             break;
         
         default:
-            Serial.println("Unknown command");
             break;
     }
     
