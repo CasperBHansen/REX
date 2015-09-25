@@ -34,10 +34,8 @@ lowThreshold=35;
 ratio = 3;
 kernel_size = 3;
 
-
 # Open a camera device for capturing
 cam = cv2.VideoCapture(0);
-
 if not cam.isOpened(): # Error
     print "Could not open camera";
     exit(-1);
@@ -48,12 +46,10 @@ if not cam.isOpened(): # Error
 width = int(cam.get(capPropId("FRAME_WIDTH")));
 height = int(cam.get(capPropId("FRAME_HEIGHT")));
 
-
 # Open a window
-WIN_RF = "Eksempel 2";
+WIN_RF = "Motion Test";
 cv2.namedWindow(WIN_RF);
 cv2.moveWindow(WIN_RF, 100, 0);
-
 
 # Preallocate memory
 gray_frame = np.zeros((height, width), dtype=np.uint8);
@@ -71,6 +67,9 @@ def command(msg):
     serialRead.write(msg.encode('ascii'))
 
 def find_objects():
+    if thresh == None:
+        return []
+
     # dilate the thresholded image to fill in holes, then find contours
     # on thresholded image
     (cnts, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
@@ -112,11 +111,9 @@ while cv2.waitKey(4) == -1: # Wait for a key pressed event
 	thresh = cv2.threshold(frameDelta, 25, 255, cv2.THRESH_BINARY)[1]
 	thresh = cv2.dilate(thresh, None, iterations=2)
 
-    """
     objects = find_objects()
     for obj in objects:
         draw_object(obj)
-    """
 
     # Show frames
     cv2.imshow(WIN_RF, frame)
