@@ -121,8 +121,8 @@ while cv2.waitKey(4) == -1: # Wait for a key pressed event
     key = cv2.waitKey(1) & 0xFF
 
 	# if the `q` key is pressed, break from the lop
-	if key == ord("q"):
-		break
+    if key == ord("q"):
+        break
 
 command("s")
 
