@@ -52,7 +52,7 @@ height = int(cam.get(capPropId("FRAME_HEIGHT")));
 # Open a window
 WIN_RF = "Eksempel 2";
 cv2.namedWindow(WIN_RF);
-cv2.moveWindow(WIN_RF, 100       , 0);
+cv2.moveWindow(WIN_RF, 100, 0);
 
 
 # Preallocate memory
@@ -112,9 +112,11 @@ while cv2.waitKey(4) == -1: # Wait for a key pressed event
 	thresh = cv2.threshold(frameDelta, 25, 255, cv2.THRESH_BINARY)[1]
 	thresh = cv2.dilate(thresh, None, iterations=2)
 
+    """
     objects = find_objects()
     for obj in objects:
         draw_object(obj)
+    """
 
     # Show frames
     cv2.imshow(WIN_RF, frame)
