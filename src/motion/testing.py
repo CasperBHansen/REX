@@ -117,8 +117,8 @@ while cv2.waitKey(4) == -1: # Wait for a key pressed event
 
     # Show frames
     cv2.imshow(WIN_RF, frame)
-	cv2.imshow("Thresh", thresh)
-	cv2.imshow("Frame Delta", frameDelta)
+    cv2.imshow("Thresh", thresh)
+    cv2.imshow("Frame Delta", frameDelta)
 
     key = cv2.waitKey(1) & 0xFF
 
