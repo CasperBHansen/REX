@@ -70,21 +70,21 @@ def command(msg):
     serialRead.write(msg.encode('ascii'))
 
 def find_objects():
-# dilate the thresholded image to fill in holes, then find contours
-# on thresholded image
-(cnts, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
-    cv2.CHAIN_APPROX_SIMPLE)
+    # dilate the thresholded image to fill in holes, then find contours
+    # on thresholded image
+    (cnts, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE)
 
-# loop over the contours
-objects = []
-for c in cnts:
-    # if the contour is too small, ignore it
-    if cv2.contourArea(c) < args["min_area"]:
-        continue
+    # loop over the contours
+    objects = []
+    for c in cnts:
+        # if the contour is too small, ignore it
+        if cv2.contourArea(c) < args["min_area"]:
+            continue
 
-    # compute the bounding box for the contour, draw it on the frame,
-    # and update the text
-    objects += cv2.boundingRect(c)
+        # compute the bounding box for the contour, draw it on the frame,
+        # and update the text
+        objects += cv2.boundingRect(c)
 
 return objects
 
@@ -117,7 +117,7 @@ while cv2.waitKey(4) == -1: # Wait for a key pressed event
 
     # Show frames
     cv2.imshow(WIN_RF, frame);
-    
+
 	key = cv2.waitKey(1) & 0xFF
 
 	# if the `q` key is pressed, break from the lop
