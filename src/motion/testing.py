@@ -86,7 +86,7 @@ def find_objects():
         # and update the text
         objects += cv2.boundingRect(c)
 
-return objects
+    return objects
 
 while cv2.waitKey(4) == -1: # Wait for a key pressed event
     now = time.time()
