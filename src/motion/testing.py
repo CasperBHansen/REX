@@ -116,9 +116,9 @@ while cv2.waitKey(4) == -1: # Wait for a key pressed event
         draw_object(obj)
 
     # Show frames
-    cv2.imshow(WIN_RF, frame);
+    cv2.imshow(WIN_RF, frame)
 
-	key = cv2.waitKey(1) & 0xFF
+    key = cv2.waitKey(1) & 0xFF
 
 	# if the `q` key is pressed, break from the lop
 	if key == ord("q"):
