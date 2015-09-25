@@ -34,7 +34,7 @@ def find_objects():
 	# on thresholded image
 	(cnts, _) = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
 		cv2.CHAIN_APPROX_SIMPLE)
-	
+
 	# loop over the contours
 	objects = []
 	for c in cnts:
