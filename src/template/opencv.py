@@ -76,6 +76,6 @@ while cv2.waitKey(4) == -1: # Wait for a key pressed event
         break;
 
     # Show frames
-    cv2.imshow(WIN_RF, res);
+    cv2.imshow(WIN_RF, frame);
 
 command("s")
