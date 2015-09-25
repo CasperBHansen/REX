@@ -20,13 +20,14 @@ def capPropId(prop):
     """
     return getattr(cv2 if OPCV3 else cv2.cv, ("" if OPCV3 else "CV_") + "CAP_PROP_" + prop)
 
-
+"""
 serialRead = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
 
 # wait for serial connection
 print "Waiting for serial port connection ..."
 while not serialRead.isOpen():
     sleep(1)
+"""
 
 # Define some constants
 lowThreshold=35;
