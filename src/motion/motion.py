@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 firstFrame = None
 frame = None
 thresh = None
