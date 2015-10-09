@@ -49,11 +49,18 @@ bool interpret() {
             break;
         
         case 'v':
-            robot.setVelocity(Serial.parseFloat());
+            if ((char)Serial.peek() == 'r')
+                robot.setRelativeVelocity(Serial.parseFloat());
+            else
+                robot.setVelocity(Serial.parseFloat());
             break;
         
         case 'a':
             robot.setAngle(Serial.parseFloat());
+            break;
+        
+        case '':
+            robot.setRelativeVelocity(Serial.parseFloat());
             break;
         
         case 'p':
