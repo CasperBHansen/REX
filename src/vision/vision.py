@@ -18,7 +18,7 @@ while cv2.waitKey(4) == -1:
 
     frame = cv2.imread("left.png")
     bw = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    edges = cv2.Canny(bw, 20, 50, apertureSize=3)
+    edges = cv2.Canny(bw, 100, 100, apertureSize=3)
     lines = cv2.HoughLines(edges, 4, np.pi/180, 200)
 
     for rho, theta in lines[0]:
