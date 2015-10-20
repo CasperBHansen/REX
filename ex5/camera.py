@@ -262,7 +262,7 @@ if (__name__=='__main__'):
     print "Opening and initializing camera"
     
     #cam = Camera(-1, 'macbookpro')
-    cam = Camera(-1, 'frindo')
+    cam = Camera(0, 'frindo')
     
     # Open a window
     WIN_RF1 = "Undistorted robot view";
