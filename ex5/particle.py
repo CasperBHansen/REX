@@ -65,7 +65,12 @@ def estimate_pose(particles_list):
 def move_particle(particle, delta_x, delta_y, delta_theta):
     """Move the particle by (delta_x, delta_y, delta_theta)"""
     # XXX: You implement this
-    print "particle.py: move_particle not implemented. You should do this." 
+    # print "particle.py: move_particle not implemented. You should do this." 
+    
+    particle.setX(particle.getX() + delta_x)
+    particle.setY(particle.getY() + delta_y)
+    
+    particle.setTheta(particle.getTheta() + delta_theta)
 
 
 def add_uncertainty(particles_list, sigma, theta_kappa):
