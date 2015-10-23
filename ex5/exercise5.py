@@ -108,7 +108,7 @@ def gaussian_distribution(x, mu, sigma):
     delta = x - mu
     Q = 2 * sigma * sigma
     denote = sqrt(Q * np.pi)
-    w = np.exp(-(delta*delta) / Q)
+    return (np.exp(-(delta*delta) / Q))/denote
 
 while True:
 
@@ -164,9 +164,6 @@ while True:
             D = gaussian_distribution(measured_distance, p.getDistance(), sigma)
             A = gaussian_distribution(measured_angle, p.getTheta(), sigma)
             p.setWeight(D * A)
-
-        # TODO: calculate d(i)
-
 
         # Resampling
         # XXX: You do this
