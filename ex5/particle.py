@@ -22,6 +22,9 @@ class Particle(object):
     def getWeight(self):
         return self.weight
 
+    def getDistance(self):
+        return sqrt(self.x * self.x + self.y * self.y)
+
     def setX(self, val):
         self.x = val
 

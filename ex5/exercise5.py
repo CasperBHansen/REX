@@ -104,11 +104,10 @@ print "Opening and initializing camera"
 #cam = camera.Camera(0, 'macbookpro')
 cam = camera.Camera(0, 'frindo')
 
-def distance_distribution(i, dM, d):
-    sigma = 1
+def gaussian_distribution(x, mu, sigma):
+    delta = x - mu
     Q = 2 * sigma * sigma
     denote = sqrt(Q * np.pi)
-    delta = dM - d
     w = np.exp(-(delta*delta) / Q)
 
 while True:
@@ -159,9 +158,12 @@ while True:
 
         # Compute particle weights
         # XXX: You do this
-        for p in particles:
-            d = 
 
+        sigma = 1 # testing with sigma = 1
+        for p in particles:
+            D = gaussian_distribution(measured_distance, p.getDistance(), sigma)
+            A = gaussian_distribution(measured_angle, p.getTheta(), sigma)
+            p.setWeight(D * A)
 
         # TODO: calculate d(i)
 
