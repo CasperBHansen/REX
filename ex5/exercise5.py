@@ -104,6 +104,13 @@ print "Opening and initializing camera"
 #cam = camera.Camera(0, 'macbookpro')
 cam = camera.Camera(0, 'frindo')
 
+def distance_distribution(i, dM, d):
+    sigma = 1
+    Q = 2 * sigma * sigma
+    denote = sqrt(Q * np.pi)
+    delta = dM - d
+    w = np.exp(-(delta*delta) / Q)
+
 while True:
 
     # Move the robot according to user input (for testing)
@@ -152,6 +159,12 @@ while True:
 
         # Compute particle weights
         # XXX: You do this
+        for p in particles:
+            d = 
+
+
+        # TODO: calculate d(i)
+
 
         # Resampling
         # XXX: You do this
