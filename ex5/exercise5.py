@@ -20,10 +20,10 @@ CBLACK = (0, 0, 0)
 # Landmarks.
 # The robot knows the position of 2 landmarks. Their coordinates are in cm.
 landmarks = [(0, 0), (300, 0)]
-target = Particle(150, 0, 0) # should we specify an angle for the target? Should be nil for exam!
+target = particle.Particle(150, 0, 0) # should we specify an angle for the target? Should be nil for exam!
 
 # Exam landmarks
-goals = [Landmark('L1', CRED, 'vertical'), Landmark('L2', CGREEN, 'vertical'), Landmark('L3', CGREEN, 'horizontal'), Landmark('L4', CRED, 'horizontal')]
+goals = [landmark.Landmark('L1', CRED, 'vertical'), landmark.Landmark('L2', CGREEN, 'vertical'), landmark.Landmark('L3', CGREEN, 'horizontal'), landmark.Landmark('L4', CRED, 'horizontal')]
 
 port = '/dev/ttyACM0'
 serialRead = serial.Serial(port,9600, timeout=1)
@@ -191,9 +191,9 @@ while True: # for exam, change to len(goals) > 0
     """ EXAM: Robot movement """
 
     # fallback when we have no target, it will try to go/rotate there
-    delta = est_pose.getDeltaForTarget(0, 0, 90)
+    delta = est_pose.getDeltaForTarget(particle.Particle(0, 0, 90)
     
-    if target:
+    if target is not None:
         delta = est_pose.getDeltaForTarget(target)
 
         # if we're within "visiting distance" of the goal
@@ -202,11 +202,12 @@ while True: # for exam, change to len(goals) > 0
             goals.pop()
             target = None
         else:
+            print "something"
             # TODO: turn delta.getTheta()
             # TODO: drive forward delta.getDistance()
 
-    # Read odometry, see how far we have moved, and update particles.
-    # Or use motor controls to update particles
+            # Read odometry, see how far we have moved, and update particles.
+            # Or use motor controls to update particles
     for particle in particles:
         s = sin(delta.getTheta())
         c = cos(delta.getTheta())
