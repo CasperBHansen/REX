@@ -25,6 +25,15 @@ class Particle(object):
     def getDistance(self):
         return np.sqrt(self.x * self.x + self.y * self.y)
 
+    def getDeltaForTarget(self, target):
+        a = target.getX() - self.x
+        b = target.getY() - self.y
+        c = np.sqrt(a * a + b * b)
+
+        theta = np.arccos(a/c)
+
+        return Particle(a, b, theta)
+
     def setX(self, val):
         self.x = val
 

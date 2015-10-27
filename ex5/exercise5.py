@@ -21,6 +21,7 @@ CBLACK = (0, 0, 0)
 # Landmarks.
 # The robot knows the position of 2 landmarks. Their coordinates are in cm.
 landmarks = [(0, 0), (300, 0)]
+target = Particle(150, 0, 0) # should we specify an angle for the target?
 
 port = '/dev/ttyACM0'
 serialRead = serial.Serial(port,9600, timeout=1)
@@ -188,6 +189,8 @@ while True:
 
 
     # XXX: Make the robot drive
+    delta = est_pose.getDeltaForTarget(target)
+
     # Read odometry, see how far we have moved, and update particles.
     # Or use motor controls to update particles
     # XXX: You do this
@@ -217,8 +220,6 @@ while True:
                     continue
 
                 # Compute particle weights
-                # XXX: You do this
-
                 sigma = 1 # testing with sigma = 1
                 for p in particles:
                     D = gaussian_distribution(measured_distance, p.getDistance(), sigma)
@@ -226,8 +227,8 @@ while True:
                     p.setWeight(D * A)
 
                 # Resampling
-                # XXX: You do this
                 particles = resample(particles, 200)
+
                 # Draw detected pattern
                 cam.draw_object(colour)
             else:
