@@ -1,11 +1,10 @@
 import cv2
 import particle
+import landmark
 import camera
 import serial
 import time
 import numpy as np
-
-
 
 
 # Some colors constants
@@ -21,7 +20,10 @@ CBLACK = (0, 0, 0)
 # Landmarks.
 # The robot knows the position of 2 landmarks. Their coordinates are in cm.
 landmarks = [(0, 0), (300, 0)]
-target = Particle(150, 0, 0) # should we specify an angle for the target?
+target = Particle(150, 0, 0) # should we specify an angle for the target? Should be nil for exam!
+
+# Exam landmarks
+goals = [Landmark('L1', CRED, 'vertical'), Landmark('L2', CGREEN, 'vertical'), Landmark('L3', CGREEN, 'horizontal'), Landmark('L4', CRED, 'horizontal')]
 
 port = '/dev/ttyACM0'
 serialRead = serial.Serial(port,9600, timeout=1)
@@ -84,8 +86,6 @@ cv2.moveWindow(WIN_RF1, 50       , 50);
 WIN_World = "World view";
 cv2.namedWindow(WIN_World);
 cv2.moveWindow(WIN_World, 500       , 50);
-
-
 
 # Initialize particles
 num_particles = 1000
@@ -168,7 +168,7 @@ def resample(particel_list, sample_random):
         RS_particles.append(p)
     return RS_particles
 
-while True:
+while True: # for exam, change to len(goals) > 0
 
     # Move the robot according to user input (for testing)
     action = cv2.waitKey(10)
@@ -187,17 +187,35 @@ while True:
     elif action == ord('q'): # Quit
         break
 
-
     # XXX: Make the robot drive
-    delta = est_pose.getDeltaForTarget(target)
+    """ EXAM: Robot movement """
 
-    # TODO: turn delta.getTheta()
-    # TODO: drive forward delta.getDistance()
+    # fallback when we have no target, it will try to go/rotate there
+    delta = est_pose.getDeltaForTarget(0, 0, 90)
+    
+    if target:
+        delta = est_pose.getDeltaForTarget(target)
+
+        # if we're within "visiting distance" of the goal
+        if delta.getDistance() < 75: # this may have to be less
+            print "We've visited ", target.getIdentifier()
+            goals.pop()
+            target = None
+        else:
+            # TODO: turn delta.getTheta()
+            # TODO: drive forward delta.getDistance()
 
     # Read odometry, see how far we have moved, and update particles.
     # Or use motor controls to update particles
-    # XXX: You do this
+    for particle in particles:
+        s = sin(delta.getTheta())
+        c = cos(delta.getTheta())
+        
+        x = particle.getX()
+        y = particle.getY()
 
+        particle.setX((x * c - y * s) - delta.getX())
+        particle.setY((x * s + y * c) - delta.getY())
 
     # Fetch next frame
     colour, distorted = cam.get_colour()    
@@ -221,6 +239,27 @@ while True:
                 else:
                     print "Unknown landmark type"
                     continue
+
+                """ FOR EXAM """
+                for goal in goals:
+
+                    # if we find one of the goals
+                    if goal.matches(orientation, colourProb):
+                        
+                        # calculate position of the goal
+                        x = np.cos(measured_angle) * measured_distance
+                        y = np.sin(measured_angle) * measured_distance
+
+                        # set its position
+                        goal.setPosition(x, y)
+
+                        # announce that we're clever enough to identify which goal and where it is :)
+                        print "Found ", goal.getIdentifier(), " at (", goal.getX(), ",", goal.getY(), ")"
+
+                        # is it the one we want to visit?
+                        if goal == goals[0]:
+                            target = goal
+                
 
                 # Compute particle weights
                 sigma = 1 # testing with sigma = 1
@@ -250,7 +289,8 @@ while True:
 
     # Show world
     cv2.imshow(WIN_World, world);
-    
-    
+
+# for exam, measure time and do; print "Finished in x seconds!"
+
 # Close all windows
 cv2.destroyAllWindows()
