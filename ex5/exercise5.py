@@ -104,6 +104,19 @@ print "Opening and initializing camera"
 #cam = camera.Camera(0, 'macbookpro')
 cam = camera.Camera(0, 'frindo')
 
+# normalizes the weights of a particle set
+def normalize(ps):
+    sum = 0
+    for p in ps:
+        sum += p.getWeight()
+
+    mu = 1 / sum
+    
+    for p in ps:
+        w = p.getWeight()
+        p.setWeight(mu * w)
+
+# gaussian distribution function
 def gaussian_distribution(x, mu, sigma):
     delta = x - mu
     Q = 2 * sigma * sigma
