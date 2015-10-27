@@ -1,6 +1,8 @@
 import cv2
 import particle
 import camera
+import serial
+import time
 import numpy as np
 
 
@@ -20,6 +22,13 @@ CBLACK = (0, 0, 0)
 # The robot knows the position of 2 landmarks. Their coordinates are in cm.
 landmarks = [(0, 0), (300, 0)]
 
+port = '/dev/ttyACM0'
+serialRead = serial.Serial(port,9600, timeout=1)
+
+movestarttime = 0.0
+currentmove = "0"
+nextmove = "0"
+waittime = 0.0
 
 def jet(x):
     """Colour map for drawing particles. This function determines the colour of 
@@ -104,24 +113,59 @@ print "Opening and initializing camera"
 #cam = camera.Camera(0, 'macbookpro')
 cam = camera.Camera(0, 'frindo')
 
-# normalizes the weights of a particle set
-def normalize(ps):
-    sum = 0
-    for p in ps:
-        sum += p.getWeight()
-
-    mu = 1 / sum
-    
-    for p in ps:
-        w = p.getWeight()
-        p.setWeight(mu * w)
-
-# gaussian distribution function
 def gaussian_distribution(x, mu, sigma):
     delta = x - mu
     Q = 2 * sigma * sigma
-    denote = sqrt(Q * np.pi)
+    denote = np.sqrt(Q * np.pi)
     return (np.exp(-(delta*delta) / Q))/denote
+
+def stop():
+    # send stop command to the adrino
+    # calculate and apply the movemt to the particles
+    msg = 's'
+    serialRead.write(msg.encode('ascii'))
+    runtime = time.time() - movestarttime
+    nextmove = "0"
+    waittime = time.time() + 0.4
+    if currentmove == "F":
+        print "F"
+    elif currentmove == "H":
+        print "H"
+    elif currentmove == "L":
+        print "L"
+
+def movecommand (command):
+    #sends command to the adrino, saves the current time and command.
+    if command == "F":
+        msg = 'p 10.5 1.0'
+    elif command == "L":
+        msg = 'p 90.0 1.0'
+    elif command == "H":
+        msg = 'p 270.0 1.0'
+    else:
+        print "WARNING: unknown move command!"
+    serialRead.write(msg.encode('ascii'))
+    movestarttime = time.time()
+    currentmove = command
+
+def resample(particel_list, sample_random):
+    RS_particles = []
+    total_weight = 0.0
+    num_sample = num_particles - sample_random
+    for p in particel_list:
+        total_weight += p.getWeight()
+    for i in range(num_sample):
+        random_number =  total_weight * np.random.random_sample()
+        random_number -= particel_list[0].getWeight()
+        n = 0
+        while random_number > 0.0:
+            n += 1
+            random_number -= particles[n].getWeight()
+        RS_particles.append(particles[n])
+    for i in range(sample_random):
+        p = particle.Particle(2000.0*np.random.ranf() - 1000, 2000.0*np.random.ranf() - 1000, 2.0*np.pi*np.random.ranf() - np.pi, 1.0/num_particles)
+        RS_particles.append(p)
+    return RS_particles
 
 while True:
 
@@ -152,44 +196,47 @@ while True:
     # Fetch next frame
     colour, distorted = cam.get_colour()    
     
-    
-    # Detect objects
-    objectType, measured_distance, measured_angle, colourProb = cam.get_object(colour)
-    if objectType != 'none':
-        print "Object type = ", objectType
-        print "Measured distance = ", measured_distance
-        print "Measured angle = ", measured_angle
-        print "Colour probabilities = ", colourProb
-
-        if (objectType == 'horizontal'):
-            print "Landmark is horizontal"
-        elif (objectType == 'vertical'):
-            print "Landmark is vertical"
+    if waittime < time.time():
+        if nextmove == "S":
+            stop()
         else:
-            print "Unknown landmark type"
-            continue
+            # Detect objects
+            objectType, measured_distance, measured_angle, colourProb = cam.get_object(colour)
+            if objectType != 'none':
+                print "Object type = ", objectType
+                print "Measured distance = ", measured_distance
+                print "Measured angle = ", measured_angle
+                print "Colour probabilities = ", colourProb
 
-        # Compute particle weights
-        # XXX: You do this
+                if (objectType == 'horizontal'):
+                    print "Landmark is horizontal"
+                elif (objectType == 'vertical'):
+                    print "Landmark is vertical"
+                else:
+                    print "Unknown landmark type"
+                    continue
 
-        sigma = 1 # testing with sigma = 1
-        for p in particles:
-            D = gaussian_distribution(measured_distance, p.getDistance(), sigma)
-            A = gaussian_distribution(measured_angle, p.getTheta(), sigma)
-            p.setWeight(D * A)
+                # Compute particle weights
+                # XXX: You do this
 
-        # Resampling
-        # XXX: You do this
+                sigma = 1 # testing with sigma = 1
+                for p in particles:
+                    D = gaussian_distribution(measured_distance, p.getDistance(), sigma)
+                    A = gaussian_distribution(measured_angle, p.getTheta(), sigma)
+                    p.setWeight(D * A)
 
-        # Draw detected pattern
-        cam.draw_object(colour)
-    else:
-        # No observation - reset weights to uniform distribution
-        for p in particles:
-            p.setWeight(1.0/num_particles)
+                # Resampling
+                # XXX: You do this
+                particles = resample(particles, 200)
+                # Draw detected pattern
+                cam.draw_object(colour)
+            else:
+                # No observation - reset weights to uniform distribution
+                for p in particles:
+                    p.setWeight(1.0/num_particles)
 
     
-    est_pose = particle.estimate_pose(particles) # The estimate of the robots current pose
+            est_pose = particle.estimate_pose(particles) # The estimate of the robots current pose
 
     # Draw map
     draw_world(est_pose, particles, world)
