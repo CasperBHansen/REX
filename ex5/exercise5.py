@@ -191,6 +191,9 @@ while True:
     # XXX: Make the robot drive
     delta = est_pose.getDeltaForTarget(target)
 
+    # TODO: turn delta.getTheta()
+    # TODO: drive forward delta.getDistance()
+
     # Read odometry, see how far we have moved, and update particles.
     # Or use motor controls to update particles
     # XXX: You do this
