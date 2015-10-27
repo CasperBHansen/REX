@@ -32,7 +32,7 @@ class Particle(object):
 
         theta = np.arccos(a/c)
 
-        return Particle(a, b, theta)
+        return Particle(a, b, theta - self.theta)
 
     def setX(self, val):
         self.x = val
