@@ -33,6 +33,12 @@ currentmove = "0"
 nextmove = "0"
 waittime = 0.0
 
+cm_per_sec = None
+deg_per_sec = None
+
+def is_calibrated():
+    return (cm_per_sec is not None) and (deg_per_sec is not None)
+
 def jet(x):
     """Colour map for drawing particles. This function determines the colour of 
     a particle from its weight."""
@@ -168,6 +174,63 @@ def resample(particel_list, sample_random):
         RS_particles.append(p)
     return RS_particles
 
+def detect_objects():
+    # Detect objects
+    objectType, measured_distance, measured_angle, colourProb = cam.get_object(colour)
+    if objectType != 'none':
+        print "Object type = ", objectType
+        print "Measured distance = ", measured_distance
+        print "Measured angle = ", measured_angle
+        print "Colour probabilities = ", colourProb
+
+        if (objectType == 'horizontal'):
+            print "Landmark is horizontal"
+        elif (objectType == 'vertical'):
+            print "Landmark is vertical"
+        else:
+            print "Unknown landmark type"
+            continue
+
+        """ FOR EXAM """
+        for goal in goals:
+
+            # if we find one of the goals
+            if goal.matches(orientation, colourProb):
+                
+                # calculate position of the goal
+                x = np.cos(measured_angle) * measured_distance
+                y = np.sin(measured_angle) * measured_distance
+
+                # set its position
+                goal.setPosition(x, y)
+
+                # announce that we're clever enough to identify which goal and where it is :)
+                print "Found ", goal.getIdentifier(), " at (", goal.getX(), ",", goal.getY(), ")"
+
+                # is it the one we want to visit?
+                if goal == goals[0]:
+                    target = goal
+
+        # Compute particle weights
+        sigma = 1 # testing with sigma = 1
+        for p in particles:
+            D = gaussian_distribution(measured_distance, p.getDistance(), sigma)
+            A = gaussian_distribution(measured_angle, p.getTheta(), sigma)
+            p.setWeight(D * A)
+
+        # Resampling
+        particles = resample(particles, 200)
+
+        # Draw detected pattern
+        cam.draw_object(colour)
+    else:
+        # No observation - reset weights to uniform distribution
+        for p in particles:
+            p.setWeight(1.0/num_particles)
+
+
+    est_pose = estimate_pose(particles) # The estimate of the robots current pose
+
 while True: # for exam, change to len(goals) > 0
 
     # Move the robot according to user input (for testing)
@@ -190,9 +253,24 @@ while True: # for exam, change to len(goals) > 0
     # XXX: Make the robot drive
     """ EXAM: Robot movement """
 
+    # calibration test
+    if not is_calibrated():
+        print "Hold on to your socks, I'm calibrating .."
+
+        # make sure we have a target for reference
+        if target is not None:
+            d = target.getDistance()
+
+
+        else:
+            print "Hmm... I have no target to use for calibration.."
+            # TODO: rotate, or something to find a target
+
+
     # fallback when we have no target, it will try to go/rotate there
     delta = est_pose.getDeltaForTarget(Particle(0, 0, 90))
-    
+
+    # if we have a target
     if target is not None:
         delta = est_pose.getDeltaForTarget(target)
 
@@ -225,62 +303,7 @@ while True: # for exam, change to len(goals) > 0
         if nextmove == "S":
             stop()
         else:
-            # Detect objects
-            objectType, measured_distance, measured_angle, colourProb = cam.get_object(colour)
-            if objectType != 'none':
-                print "Object type = ", objectType
-                print "Measured distance = ", measured_distance
-                print "Measured angle = ", measured_angle
-                print "Colour probabilities = ", colourProb
-
-                if (objectType == 'horizontal'):
-                    print "Landmark is horizontal"
-                elif (objectType == 'vertical'):
-                    print "Landmark is vertical"
-                else:
-                    print "Unknown landmark type"
-                    continue
-
-                """ FOR EXAM """
-                for goal in goals:
-
-                    # if we find one of the goals
-                    if goal.matches(orientation, colourProb):
-                        
-                        # calculate position of the goal
-                        x = np.cos(measured_angle) * measured_distance
-                        y = np.sin(measured_angle) * measured_distance
-
-                        # set its position
-                        goal.setPosition(x, y)
-
-                        # announce that we're clever enough to identify which goal and where it is :)
-                        print "Found ", goal.getIdentifier(), " at (", goal.getX(), ",", goal.getY(), ")"
-
-                        # is it the one we want to visit?
-                        if goal == goals[0]:
-                            target = goal
-                
-
-                # Compute particle weights
-                sigma = 1 # testing with sigma = 1
-                for p in particles:
-                    D = gaussian_distribution(measured_distance, p.getDistance(), sigma)
-                    A = gaussian_distribution(measured_angle, p.getTheta(), sigma)
-                    p.setWeight(D * A)
-
-                # Resampling
-                particles = resample(particles, 200)
-
-                # Draw detected pattern
-                cam.draw_object(colour)
-            else:
-                # No observation - reset weights to uniform distribution
-                for p in particles:
-                    p.setWeight(1.0/num_particles)
-
-    
-            est_pose = estimate_pose(particles) # The estimate of the robots current pose
+            detect_objects()
 
     # Draw map
     draw_world(est_pose, particles, world)
