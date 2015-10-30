@@ -1,10 +1,11 @@
 import cv2
-from particle import Particle, estimate_pose
-from landmark import Landmark
 import camera
 import serial
 import time
 import numpy as np
+
+from particle import Particle, estimate_pose
+from landmark import Landmark
 
 
 # Some colors constants
@@ -94,6 +95,7 @@ cv2.namedWindow(WIN_World);
 cv2.moveWindow(WIN_World, 500       , 50);
 
 # Initialize particles
+print "Initializing particles .."
 num_particles = 1000
 particles = []
 for i in range(num_particles):
@@ -189,7 +191,7 @@ def detect_objects():
             print "Landmark is vertical"
         else:
             print "Unknown landmark type"
-            continue
+	    return
 
         """ FOR EXAM """
         for goal in goals:
@@ -236,19 +238,8 @@ while True: # for exam, change to len(goals) > 0
     # Move the robot according to user input (for testing)
     action = cv2.waitKey(10)
     
-    if action == ord('w'): # Forward
-        velocity += 4.0;
-    elif action == ord('x'): # Backwards
-        velocity -= 4.0;
-    elif action == ord('s'): # Stop
-        velocity = 0.0;
-        angular_velocity = 0.0;
-    elif action == ord('a'): # Left
-        angular_velocity += 0.2;
-    elif action == ord('d'): # Right
-        angular_velocity -= 0.2;
-    elif action == ord('q'): # Quit
-        break
+    if action == ord('q'):
+	break
 
     # XXX: Make the robot drive
     """ EXAM: Robot movement """
@@ -260,8 +251,6 @@ while True: # for exam, change to len(goals) > 0
         # make sure we have a target for reference
         if target is not None:
             d = target.getDistance()
-
-
         else:
             print "Hmm... I have no target to use for calibration.."
             # TODO: rotate, or something to find a target
@@ -286,6 +275,7 @@ while True: # for exam, change to len(goals) > 0
 
             # Read odometry, see how far we have moved, and update particles.
             # Or use motor controls to update particles
+
     for particle in particles:
         s = np.sin(delta.getTheta())
         c = np.cos(delta.getTheta())
@@ -303,7 +293,62 @@ while True: # for exam, change to len(goals) > 0
         if nextmove == "S":
             stop()
         else:
-            detect_objects()
+	    # Detect objects
+	    objectType, measured_distance, measured_angle, colourProb = cam.get_object(colour)
+	    if objectType != 'none':
+		print "Object type = ", objectType
+		print "Measured distance = ", measured_distance
+		print "Measured angle = ", measured_angle
+		print "Colour probabilities = ", colourProb
+
+		if (objectType == 'horizontal'):
+		    print "Landmark is horizontal"
+		elif (objectType == 'vertical'):
+		    print "Landmark is vertical"
+		else:
+		    print "Unknown landmark type"
+		    continue
+
+		""" FOR EXAM """
+		for goal in goals:
+
+		    # if we find one of the goals
+		    if goal.matches(orientation, colourProb):
+			
+			# calculate position of the goal
+			x = np.cos(measured_angle) * measured_distance
+			y = np.sin(measured_angle) * measured_distance
+
+			# set its position
+			goal.setPosition(x, y)
+
+			# announce that we're clever enough to identify which goal and where it is :)
+			print "Found ", goal.getIdentifier(), " at (", goal.getX(), ",", goal.getY(), ")"
+
+			# is it the one we want to visit?
+			if goal == goals[0]:
+			    target = goal
+
+		# Compute particle weights
+		sigma = 1 # testing with sigma = 1
+		for p in particles:
+		    D = gaussian_distribution(measured_distance, p.getDistance(), sigma)
+		    A = gaussian_distribution(measured_angle, p.getTheta(), sigma)
+		    p.setWeight(D * A)
+
+		# Resampling
+		particles = resample(particles, 200)
+
+		# Draw detected pattern
+		cam.draw_object(colour)
+	    else:
+		# No observation - reset weights to uniform distribution
+		for p in particles:
+		    p.setWeight(1.0/num_particles)
+
+
+	    est_pose = estimate_pose(particles) # The estimate of the robots current pose
+
 
     # Draw map
     draw_world(est_pose, particles, world)

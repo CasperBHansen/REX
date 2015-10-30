@@ -86,8 +86,8 @@ class Camera(object):
             
             self.rawCapture = PiRGBArray(self.cam, size=self.cam.resolution)
             
+            #self.capture_generator = self.cam.capture_continuous(self.rawCapture, format="bgr", use_video_port=True)
             self.capture_generator = self.cam.capture_continuous(self.rawCapture, format="bgr", use_video_port=True)
-            
             
             print "Camera width = ", self.cam.resolution[0]
             print "Camera height = ", self.cam.resolution[1]
@@ -137,6 +137,7 @@ class Camera(object):
             # Use piCamera
             
             frame = self.capture_generator.next()
+            #frame = self.cam.capture(format="bgr")
             distorted = frame.array
             
             # clear the stream in preparation for the next frame
