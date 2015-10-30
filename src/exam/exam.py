@@ -1,6 +1,6 @@
 import cv2
-import particle
-import landmark
+from particle import Particle, estimate_pose
+from landmark import Landmark
 import camera
 import serial
 import time
@@ -92,10 +92,10 @@ num_particles = 1000
 particles = []
 for i in range(num_particles):
     # Random starting points. (x,y) \in [-1000, 1000]^2, theta \in [-pi, pi].
-    p = particle.Particle(2000.0*np.random.ranf() - 1000, 2000.0*np.random.ranf() - 1000, 2.0*np.pi*np.random.ranf() - np.pi, 1.0/num_particles)
+    p = Particle(2000.0*np.random.ranf() - 1000, 2000.0*np.random.ranf() - 1000, 2.0*np.pi*np.random.ranf() - np.pi, 1.0/num_particles)
     particles.append(p)
 
-est_pose = particle.estimate_pose(particles) # The estimate of the robots current pose
+est_pose = estimate_pose(particles) # The estimate of the robots current pose
 
 # Driving parameters
 velocity = 0.0; # cm/sec
@@ -191,9 +191,9 @@ while True: # for exam, change to len(goals) > 0
     """ EXAM: Robot movement """
 
     # fallback when we have no target, it will try to go/rotate there
-    delta = est_pose.getDeltaForTarget(0, 0, 90)
+    delta = est_pose.getDeltaForTarget(Particle(0, 0, 90))
     
-    if target:
+    if target is not None:
         delta = est_pose.getDeltaForTarget(target)
 
         # if we're within "visiting distance" of the goal
@@ -202,14 +202,15 @@ while True: # for exam, change to len(goals) > 0
             goals.pop()
             target = None
         else:
+            print "something"
             # TODO: turn delta.getTheta()
             # TODO: drive forward delta.getDistance()
 
-    # Read odometry, see how far we have moved, and update particles.
-    # Or use motor controls to update particles
+            # Read odometry, see how far we have moved, and update particles.
+            # Or use motor controls to update particles
     for particle in particles:
-        s = sin(delta.getTheta())
-        c = cos(delta.getTheta())
+        s = np.sin(delta.getTheta())
+        c = np.cos(delta.getTheta())
         
         x = particle.getX()
         y = particle.getY()
@@ -279,7 +280,7 @@ while True: # for exam, change to len(goals) > 0
                     p.setWeight(1.0/num_particles)
 
     
-            est_pose = particle.estimate_pose(particles) # The estimate of the robots current pose
+            est_pose = estimate_pose(particles) # The estimate of the robots current pose
 
     # Draw map
     draw_world(est_pose, particles, world)
