@@ -7,6 +7,8 @@ import numpy as np
 from particle import Particle, estimate_pose
 from landmark import Landmark
 
+DEMO = False
+
 
 # Some colors constants
 CRED = (0, 0, 255)
@@ -20,14 +22,17 @@ CBLACK = (0, 0, 0)
 
 # Landmarks.
 # The robot knows the position of 2 landmarks. Their coordinates are in cm.
-landmarks = [(0, 0), (300, 0)]
-target = Particle(150, 0, 0) # should we specify an angle for the target? Should be nil for exam!
+landmarks = [(0, 0), (0, 300), (400, 0), (400, 300)]
+target = None # should we specify an angle for the target? Should be nil for exam!
 
 # Exam landmarks
 goals = [Landmark('L1', CRED, 'vertical'), Landmark('L2', CGREEN, 'vertical'), Landmark('L3', CGREEN, 'horizontal'), Landmark('L4', CRED, 'horizontal')]
+avoid = []
 
 port = '/dev/ttyACM0'
-serialRead = serial.Serial(port,9600, timeout=1)
+
+if DEMO:
+    serialRead = serial.Serial(port,9600, timeout=1)
 
 movestarttime = 0.0
 currentmove = "0"
@@ -85,14 +90,15 @@ def draw_world(est_pose, particles, world):
 
 ### Main program ###
 
-# Open windows
-WIN_RF1 = "Robot view";
-cv2.namedWindow(WIN_RF1);
-cv2.moveWindow(WIN_RF1, 50       , 50);
+if DEMO:
+    # Open windows
+    WIN_RF1 = "Robot view";
+    cv2.namedWindow(WIN_RF1);
+    cv2.moveWindow(WIN_RF1, 50, 50);
 
-WIN_World = "World view";
-cv2.namedWindow(WIN_World);
-cv2.moveWindow(WIN_World, 500       , 50);
+    WIN_World = "World view";
+    cv2.namedWindow(WIN_World);
+    cv2.moveWindow(WIN_World, 500, 50);
 
 # Initialize particles
 print "Initializing particles .."
@@ -106,8 +112,8 @@ for i in range(num_particles):
 est_pose = estimate_pose(particles) # The estimate of the robots current pose
 
 # Driving parameters
-velocity = 0.0; # cm/sec
-angular_velocity = 0.0; # radians/sec
+velocity = 0.0 # cm/sec
+angular_velocity = 0.0 # radians/sec
 
 # Initialize the robot (XXX: You do this)
 
@@ -119,8 +125,9 @@ draw_world(est_pose, particles, world)
 
 print "Opening and initializing camera"
 
-#cam = camera.Camera(0, 'macbookpro')
-cam = camera.Camera(0, 'frindo')
+if DEMO:
+    #cam = camera.Camera(0, 'macbookpro')
+    cam = camera.Camera(0, 'frindo')
 
 def gaussian_distribution(x, mu, sigma):
     delta = x - mu
@@ -151,11 +158,16 @@ def movecommand (command):
         msg = 'p 90.0 1.0'
     elif command == "H":
         msg = 'p 270.0 1.0'
+    elif command == "CCW":
+        msg = 'p 120.0 1.0'
     else:
         print "WARNING: unknown move command!"
     serialRead.write(msg.encode('ascii'))
     movestarttime = time.time()
     currentmove = command
+
+def ccw_deg_2_time(theta):
+    return 1.3423 * (theta / 360.0) + 0.9646
 
 def resample(particel_list, sample_random):
     RS_particles = []
@@ -172,32 +184,38 @@ def resample(particel_list, sample_random):
             random_number -= particles[n].getWeight()
         RS_particles.append(particles[n])
     for i in range(sample_random):
-        p = particle.Particle(2000.0*np.random.ranf() - 1000, 2000.0*np.random.ranf() - 1000, 2.0*np.pi*np.random.ranf() - np.pi, 1.0/num_particles)
+        p = Particle(2000.0*np.random.ranf() - 1000, 2000.0*np.random.ranf() - 1000, 2.0*np.pi*np.random.ranf() - np.pi, 1.0/num_particles)
         RS_particles.append(p)
     return RS_particles
 
 def detect_objects():
-    # Detect objects
-    objectType, measured_distance, measured_angle, colourProb = cam.get_object(colour)
-    if objectType != 'none':
-        print "Object type = ", objectType
-        print "Measured distance = ", measured_distance
-        print "Measured angle = ", measured_angle
-        print "Colour probabilities = ", colourProb
+    global target
+    global particles
 
-        if (objectType == 'horizontal'):
-            print "Landmark is horizontal"
-        elif (objectType == 'vertical'):
-            print "Landmark is vertical"
-        else:
-            print "Unknown landmark type"
-	    return
+    # Detect objects
+    if DEMO:
+        objectType, measured_distance, measured_angle, colourProb = cam.get_object(colour)
+    else:
+        objectType = 'vertical'
+        measured_distance = 100
+        measured_angle = 90.0
+        colourProb = (0,0,0)
+
+    if objectType != 'horizontal' and objectType != 'vertical':
+        print "Unknown landmark type"
+        return
+
+    if objectType != 'none':
+        print "Object type =", objectType
+        print "Measured distance =", measured_distance
+        print "Measured angle =", measured_angle
+        print "Colour probabilities =", colourProb
 
         """ FOR EXAM """
         for goal in goals:
 
             # if we find one of the goals
-            if goal.matches(orientation, colourProb):
+            if goal.match(objectType, colourProb):
                 
                 # calculate position of the goal
                 x = np.cos(measured_angle) * measured_distance
@@ -207,7 +225,7 @@ def detect_objects():
                 goal.setPosition(x, y)
 
                 # announce that we're clever enough to identify which goal and where it is :)
-                print "Found ", goal.getIdentifier(), " at (", goal.getX(), ",", goal.getY(), ")"
+                print "Found", goal.getIdentifier(), "at (", goal.getX(), ",", goal.getY(), ")"
 
                 # is it the one we want to visit?
                 if goal == goals[0]:
@@ -224,58 +242,57 @@ def detect_objects():
         particles = resample(particles, 200)
 
         # Draw detected pattern
-        cam.draw_object(colour)
+        if DEMO:
+            cam.draw_object(colour)
     else:
         # No observation - reset weights to uniform distribution
         for p in particles:
             p.setWeight(1.0/num_particles)
 
-
     est_pose = estimate_pose(particles) # The estimate of the robots current pose
 
 while True: # for exam, change to len(goals) > 0
 
-    # Move the robot according to user input (for testing)
     action = cv2.waitKey(10)
-    
     if action == ord('q'):
 	break
 
-    # XXX: Make the robot drive
     """ EXAM: Robot movement """
+    # XXX: Make the robot drive
 
-    # calibration test
-    if not is_calibrated():
-        print "Hold on to your socks, I'm calibrating .."
-
-        # make sure we have a target for reference
-        if target is not None:
-            d = target.getDistance()
-        else:
-            print "Hmm... I have no target to use for calibration.."
-            # TODO: rotate, or something to find a target
-
+    print "ROBOT ESTIMATION"
+    print "X: ", est_pose.getX()
+    print "Y: ", est_pose.getY()
+    print "Theta: ", est_pose.getTheta()
+    print ""
 
     # fallback when we have no target, it will try to go/rotate there
     delta = est_pose.getDeltaForTarget(Particle(0, 0, 90))
 
     # if we have a target
     if target is not None:
+
         delta = est_pose.getDeltaForTarget(target)
 
         # if we're within "visiting distance" of the goal
-        if delta.getDistance() < 75: # this may have to be less
+        if delta.getDistance() < 50: # visiting range is < 75cm, so 50cm should be close enough
             print "We've visited ", target.getIdentifier()
-            goals.pop()
+            avoid(goals.pop())
             target = None
         else:
-            print "something"
-            # TODO: turn delta.getTheta()
-            # TODO: drive forward delta.getDistance()
+            # if we're looking more or less directly at it
+            if np.abs(delta.getTheta()) < 10:
+                print "Moving toward ", target.getIdentifier()
+            else:
+                print "Centering ", target.getIdentifier()
+                command("CCW") # begins to rotate counter-clockwise
+                waittime = time.time() + ccw_deg_2_time(delta.getTheta())
+    else:
+        print "I have no target :("
 
-            # Read odometry, see how far we have moved, and update particles.
-            # Or use motor controls to update particles
 
+    # Read odometry, see how far we have moved, and update particles.
+    # Or use motor controls to update particles
     for particle in particles:
         s = np.sin(delta.getTheta())
         c = np.cos(delta.getTheta())
@@ -286,80 +303,27 @@ while True: # for exam, change to len(goals) > 0
         particle.setX((x * c - y * s) - delta.getX())
         particle.setY((x * s + y * c) - delta.getY())
 
-    # Fetch next frame
-    colour, distorted = cam.get_colour()    
+    if DEMO:
+        # Fetch next frame
+        colour, distorted = cam.get_colour()    
     
     if waittime < time.time():
         if nextmove == "S":
             stop()
         else:
-	    # Detect objects
-	    objectType, measured_distance, measured_angle, colourProb = cam.get_object(colour)
-	    if objectType != 'none':
-		print "Object type = ", objectType
-		print "Measured distance = ", measured_distance
-		print "Measured angle = ", measured_angle
-		print "Colour probabilities = ", colourProb
+            detect_objects()
 
-		if (objectType == 'horizontal'):
-		    print "Landmark is horizontal"
-		elif (objectType == 'vertical'):
-		    print "Landmark is vertical"
-		else:
-		    print "Unknown landmark type"
-		    continue
+    if DEMO:
+        # Draw map
+        draw_world(est_pose, particles, world)
+        
+        # Show frame
+        cv2.imshow(WIN_RF1, colour);
 
-		""" FOR EXAM """
-		for goal in goals:
+        # Show world
+        cv2.imshow(WIN_World, world);
 
-		    # if we find one of the goals
-		    if goal.matches(orientation, colourProb):
-			
-			# calculate position of the goal
-			x = np.cos(measured_angle) * measured_distance
-			y = np.sin(measured_angle) * measured_distance
-
-			# set its position
-			goal.setPosition(x, y)
-
-			# announce that we're clever enough to identify which goal and where it is :)
-			print "Found ", goal.getIdentifier(), " at (", goal.getX(), ",", goal.getY(), ")"
-
-			# is it the one we want to visit?
-			if goal == goals[0]:
-			    target = goal
-
-		# Compute particle weights
-		sigma = 1 # testing with sigma = 1
-		for p in particles:
-		    D = gaussian_distribution(measured_distance, p.getDistance(), sigma)
-		    A = gaussian_distribution(measured_angle, p.getTheta(), sigma)
-		    p.setWeight(D * A)
-
-		# Resampling
-		particles = resample(particles, 200)
-
-		# Draw detected pattern
-		cam.draw_object(colour)
-	    else:
-		# No observation - reset weights to uniform distribution
-		for p in particles:
-		    p.setWeight(1.0/num_particles)
-
-
-	    est_pose = estimate_pose(particles) # The estimate of the robots current pose
-
-
-    # Draw map
-    draw_world(est_pose, particles, world)
-    
-    # Show frame
-    cv2.imshow(WIN_RF1, colour);
-
-    # Show world
-    cv2.imshow(WIN_World, world);
-
-# for exam, measure time and do; print "Finished in x seconds!"
+# TODO: for exam, measure time and do; print "Finished in x seconds!"
 
 # Close all windows
 cv2.destroyAllWindows()
