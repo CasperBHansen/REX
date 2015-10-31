@@ -162,7 +162,10 @@ def movecommand (command):
         msg = 'p 120.0 1.0'
     else:
         print "WARNING: unknown move command!"
-    serialRead.write(msg.encode('ascii'))
+
+    if DEMO:
+        serialRead.write(msg.encode('ascii'))
+
     movestarttime = time.time()
     currentmove = command
 
@@ -283,13 +286,16 @@ while True: # for exam, change to len(goals) > 0
             # if we're looking more or less directly at it
             if np.abs(delta.getTheta()) < 10:
                 print "Moving toward ", target.getIdentifier()
+                movecommand("F")
+            # otherwise we can move toward the target
             else:
                 print "Centering ", target.getIdentifier()
-                command("CCW") # begins to rotate counter-clockwise
+                movecommand("CCW") # begins to rotate counter-clockwise
                 waittime = time.time() + ccw_deg_2_time(delta.getTheta())
     else:
-        print "I have no target :("
-
+        print "Looking for target .."
+        # TODO: look for a target, strategy?
+        movecommand("L")
 
     # Read odometry, see how far we have moved, and update particles.
     # Or use motor controls to update particles
