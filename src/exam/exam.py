@@ -42,6 +42,12 @@ waittime = 0.0
 cm_per_sec = None
 deg_per_sec = None
 
+def rad_2_deg(rads):
+    return rads * (180.0 / np.pi)
+
+def deg_2_rad(degs):
+    return degs * (np.pi / 180.0)
+
 def is_calibrated():
     return (cm_per_sec is not None) and (deg_per_sec is not None)
 
@@ -201,7 +207,7 @@ def detect_objects():
     else:
         objectType = 'vertical'
         measured_distance = 100
-        measured_angle = 90.0
+        measured_angle = deg_2_rad(90.0)
         colourProb = (0,0,0)
 
     if objectType != 'horizontal' and objectType != 'vertical':
