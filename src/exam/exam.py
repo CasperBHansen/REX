@@ -7,7 +7,7 @@ import numpy as np
 from particle import Particle, estimate_pose
 from landmark import Landmark
 
-DEMO = False
+DEMO = True
 
 
 # Some colors constants
@@ -21,7 +21,7 @@ CWHITE = (255, 255, 255)
 CBLACK = (0, 0, 0)
 
 # Landmarks.
-# The robot knows the position of 2 landmarks. Their coordinates are in cm.
+# The robot knows the position of 4 landmarks. Their coordinates are in cm.
 landmarks = [(0, 0), (0, 300), (400, 0), (400, 300)]
 target = None # should we specify an angle for the target? Should be nil for exam!
 
@@ -38,6 +38,9 @@ movestarttime = 0.0
 currentmove = "0"
 nextmove = "0"
 waittime = 0.0
+
+landmark_x = 0
+landmark_y = 300
 
 cm_per_sec = None
 deg_per_sec = None
@@ -148,7 +151,7 @@ def stop():
     serialRead.write(msg.encode('ascii'))
     runtime = time.time() - movestarttime
     nextmove = "0"
-    waittime = time.time() + 0.4
+    waittime = time.time() + 0.8
     if currentmove == "F":
         print "F"
     elif currentmove == "H":
@@ -161,9 +164,9 @@ def movecommand (command):
     if command == "F":
         msg = 'p 10.5 1.0'
     elif command == "L":
-        msg = 'p 90.0 1.0'
+        msg = 'p 300.0 1.0'
     elif command == "H":
-        msg = 'p 270.0 1.0'
+        msg = 'p -310.0 1.0'
     elif command == "CCW":
         msg = 'p 120.0 1.0'
     else:
@@ -204,21 +207,46 @@ def detect_objects():
     # Detect objects
     if DEMO:
         objectType, measured_distance, measured_angle, colourProb = cam.get_object(colour)
+        print "getting object"
     else:
         objectType = 'vertical'
         measured_distance = 100
         measured_angle = deg_2_rad(90.0)
         colourProb = (0,0,0)
-
+    '''
     if objectType != 'horizontal' and objectType != 'vertical':
         print "Unknown landmark type"
         return
-
+    '''
     if objectType != 'none':
         print "Object type =", objectType
         print "Measured distance =", measured_distance
         print "Measured angle =", measured_angle
         print "Colour probabilities =", colourProb
+        # determens which landmark it has found
+        if (objectType == 'horizontal'):
+            print "Landmark is horizontal"
+            if colourProb[1] < colourProb[0]:
+                print "Found landmark 4"
+                landmark_x = 400
+                landmark_y = 0
+            else:
+                print "Found landmark 3"
+                landmark_x = 400
+                landmark_y = 300
+        elif (objectType == 'vertical'):
+            print "Landmark is vertical"
+            if colourProb[1] < colourProb[0]:
+                print "Found landmark 1"
+                landmark_x = 0
+                landmark_y = 300
+            else:
+                print "Found landmark 2"
+                landmark_x = 0
+                landmark_y = 0
+            else:
+                print "Unknown landmark type"
+                continue
 
         """ FOR EXAM """
         for goal in goals:
@@ -241,14 +269,27 @@ def detect_objects():
                     target = goal
 
         # Compute particle weights
-        sigma = 1 # testing with sigma = 1
+        sigma_D = 15 
+        sigma_A = 0.2
         for p in particles:
-            D = gaussian_distribution(measured_distance, p.getDistance(), sigma)
-            A = gaussian_distribution(measured_angle, p.getTheta(), sigma)
-            p.setWeight(D * A)
+            X = p.getX()
+            Y = p.getY()
+            if (X - landmark_x) == 0 and (Y - landmark_y) == 0:
+                p.setWeight(0)
+            else:
+                distance = np.sqrt((X - landmark_x) * (X - landmark_x) + (Y - landmark_y) * (Y - landmark_y))
+                theta = p.getTheta()
+                dx = np.cos(theta)
+                dy = -np.sin(theta)
+                lx = landmark - X
+                ly = landmark - Y
+                angle = (lx*dx + ly*dy) / (np.sqrt(lx * lx + ly * ly) * np.sqrt(lx * lx + ly * ly))
+                D = gaussian_distribution(measured_distance, distance, sigma_D)
+                A = gaussian_distribution(measured_angle, angle, sigma_A)
+                p.setWeight(D * A)
 
         # Resampling
-        particles = resample(particles, 200)
+        particles = resample(particles, 100)
 
         # Draw detected pattern
         if DEMO:
@@ -273,7 +314,6 @@ while True: # for exam, change to len(goals) > 0
     print "X: ", est_pose.getX()
     print "Y: ", est_pose.getY()
     print "Theta: ", est_pose.getTheta()
-    print ""
 
     # fallback when we have no target, it will try to go/rotate there
     delta = est_pose.getDeltaForTarget(Particle(0, 0, 90))
@@ -301,8 +341,14 @@ while True: # for exam, change to len(goals) > 0
     else:
         print "Looking for target .."
         # TODO: look for a target, strategy?
-        movecommand("L")
-
+        if waittime < time.time():
+            if nextmove == "S":
+                stop()
+                nextmove = "0"
+            else:
+                movecommand("L")
+                waittime = time.time() + 1.3
+                nextmove = "S"
     # Read odometry, see how far we have moved, and update particles.
     # Or use motor controls to update particles
     for particle in particles:
@@ -317,12 +363,14 @@ while True: # for exam, change to len(goals) > 0
 
     if DEMO:
         # Fetch next frame
+        print "trying to fetch"
         colour, distorted = cam.get_colour()    
     
     if waittime < time.time():
         if nextmove == "S":
             stop()
         else:
+            print "trying to detect"
             detect_objects()
 
     if DEMO:
