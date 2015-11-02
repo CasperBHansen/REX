@@ -19,13 +19,17 @@ CMAGENTA = (255, 0, 255)
 CWHITE = (255, 255, 255)
 CBLACK = (0, 0, 0)
 
+# RGB Colors
+RED = (0.52, 0.11, 0.34)
+GREEN = (0.21, 0.42, 0.36)
+
 # Landmarks.
 # The robot knows the position of 4 landmarks. Their coordinates are in cm.
 landmarks = [(0, 0), (0, 300), (400, 0), (400, 300)]
 target = None # should we specify an angle for the target? Should be nil for exam!
 
 # Exam landmarks
-goals = [Landmark('L1', CRED, 'vertical'), Landmark('L2', CGREEN, 'vertical'), Landmark('L3', CGREEN, 'horizontal'), Landmark('L4', CRED, 'horizontal')]
+goals = [Landmark('L1', (0,300), RED, 'vertical'), Landmark('L2', (0,0), GREEN, 'vertical'), Landmark('L3', (300,400), GREEN, 'horizontal'), Landmark('L4', (400,0), RED, 'horizontal')]
 avoid = []
 
 port = '/dev/ttyACM0'
@@ -215,8 +219,11 @@ def resample(particel_list, sample_random):
     return RS_particles
 
 def detect_objects():
+    global goals
     global target
     global particles
+    global landmark_x
+    global landmark_y
 
     # Detect objects
     if DEMO:
@@ -280,19 +287,11 @@ def detect_objects():
 
                 # announce that we're clever enough to identify which goal and where it is :)
                 print "Found", goal.getIdentifier(), "at (", goal.getX(), ",", goal.getY(), ")"
-                if goal.getIdentifier() = "L1":
-                    landmark_x = 0
-                    landmark_y = 300
-                elif goal.getIdentifier() = "L2":
-                    landmark_x = 0
-                    landmark_y = 0
-                elif goal.getIdentifier() = "L3":
-                    landmark_x = 400
-                    landmark_y = 300
-                elif goal.getIdentifier() = "L4":
-                    landmark_x = 400
-                    landmark_y = 0
-                break
+                goals = []
+                return
+
+                landmark_x = goal.getUX()
+                landmark_y = goal.getUY()
 
                 # is it the one we want to visit?
                 if goal == goals[0]:
@@ -312,10 +311,14 @@ def detect_objects():
                 dx = np.cos(theta)
                 dy = -np.sin(theta)
                 lx = landmark_x - X
-                ly = landmark_y - Y
+                ly = landmark_y - Y 
                 angle = (lx*dx + ly*dy) / (np.sqrt(lx * lx + ly * ly) * np.sqrt(lx * lx + ly * ly))
+                if angle < -1:
+                    angle = -1
+                elif angle > 1:
+                    angle = 1
                 D = gaussian_distribution(measured_distance, distance, sigma_D)
-                A = gaussian_distribution(measured_angle, angle, sigma_A)
+                A = gaussian_distribution(measured_angle, np.arccos(angle), sigma_A)
                 p.setWeight(D * A)
 
         # Resampling
@@ -331,7 +334,7 @@ def detect_objects():
 
     est_pose = estimate_pose(particles) # The estimate of the robots current pose
 
-while True: # for exam, change to len(goals) > 0
+while len(goals) > 0:
 
     action = cv2.waitKey(10)
     if action == ord('q'):
@@ -340,10 +343,10 @@ while True: # for exam, change to len(goals) > 0
     """ EXAM: Robot movement """
     # XXX: Make the robot drive
 
-    print "ROBOT ESTIMATION"
-    print "X: ", est_pose.getX()
-    print "Y: ", est_pose.getY()
-    print "Theta: ", est_pose.getTheta()
+    # print "ROBOT ESTIMATION"
+    # print "X: ", est_pose.getX()
+    # print "Y: ", est_pose.getY()
+    # print "Theta: ", est_pose.getTheta()
 
     # fallback when we have no target, it will try to go/rotate there
     delta = est_pose.getDeltaForTarget(Particle(0, 0, 90))
