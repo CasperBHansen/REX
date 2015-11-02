@@ -228,48 +228,11 @@ def detect_objects():
     # Detect objects
     if DEMO:
         objectType, measured_distance, measured_angle, colourProb = cam.get_object(colour)
-        print "getting object"
     else:
         objectType = 'vertical'
         measured_distance = 100
         measured_angle = deg_2_rad(90.0)
         colourProb = (0,0,0)
-    '''
-    if objectType != 'horizontal' and objectType != 'vertical':
-        print "Unknown landmark type"
-        return
-    '''
-
-    '''
-    if objectType != 'none':
-        print "Object type =", objectType
-        print "Measured distance =", measured_distance
-        print "Measured angle =", measured_angle
-        print "Colour probabilities =", colourProb
-        # determens which landmark it has found
-        if (objectType == 'horizontal'):
-            print "Landmark is horizontal"
-            if colourProb[1] < colourProb[0]:
-                print "Found landmark 4"
-                landmark_x = 400
-                landmark_y = 0
-            else:
-                print "Found landmark 3"
-                landmark_x = 400
-                landmark_y = 300
-        elif (objectType == 'vertical'):
-            print "Landmark is vertical"
-            if colourProb[1] < colourProb[0]:
-                print "Found landmark 1"
-                landmark_x = 0
-                landmark_y = 300
-            else:
-                print "Found landmark 2"
-                landmark_x = 0
-                landmark_y = 0
-        else:
-            print "Unknown landmark type"
-    '''
     
     if objectType != 'none':
         """ FOR EXAM """
@@ -284,9 +247,10 @@ def detect_objects():
 
                 # set its position
                 goal.setPosition(x, y)
+                goal.setTheta(measured_angle)
 
                 # announce that we're clever enough to identify which goal and where it is :)
-                print "Found", goal.getIdentifier(), "at (", goal.getX(), ",", goal.getY(), ")"
+                print "Found", goal.getIdentifier(), "at (", goal.getX(), ",", goal.getY(), "), theta: ", goal.getTheta()
                 goals = []
                 return
 
@@ -363,7 +327,7 @@ while len(goals) > 0:
             target = None
         else:
             # if we're looking more or less directly at it
-            if np.abs(delta.getTheta()) < 10:
+            if np.abs(target.getTheta()) < 0.1:
                 print "Moving toward ", target.getIdentifier()
                 movecommand("F")
             # otherwise we can move toward the target
