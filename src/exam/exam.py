@@ -4,7 +4,7 @@ import serial
 import time
 import numpy as np
 
-from particle import Particle, estimate_pose
+from particle import Particle, estimate_pose, add_uncertainty
 from landmark import Landmark
 
 DEMO = True
@@ -161,21 +161,27 @@ def stop():
     waittime = time.time() + 0.8
     if runtime > 1.0:
         if currentmove == "F":
-            print "F"
+            if runtime < 1.2:
+                distance = 0
+            else:
+                distance = foward_time_2_cm(runtime)
+                for p in particles:
+                    x = p.getX() + (np.cos(p.getTheta()) * distance)
+                    y = p.getY() + (np.sin(p.getTheta()) * distance)
+                    p.setX(x)
+                    p.setY(y)
+
         elif currentmove == "H":
-            distance = ((0.7433 * runtime -0.7159) * 360) * (np.pi/180)
+            distance = cw_time_2_deg(runtime) * (np.pi/180)
             for p in particles:
                 theta = p.getTheta()
                 p.setTheta(theta + distance)
-            particle.add_uncertainty(particles, 5, 0.2)
-            print "H"
         elif currentmove == "L":
-            distance = ((0.7433 * runtime -0.7159) * 360) * (np.pi/180)
+            distance = ccw_time_2_deg(runtime) * (np.pi/180)
             for p in particles:
                 theta = p.getTheta()
                 p.setTheta(theta - distance)
-            particle.add_uncertainty(particles, 5, 0.2)
-            print "L"
+        add_uncertainty(particles, 5, 0.2)
 
 def movecommand (command):
     #sends command to the adrino, saves the current time and command.
@@ -186,7 +192,7 @@ def movecommand (command):
     elif command == "H":
         msg = 'p -310.0 1.0'
     elif command == "CCW":
-        msg = 'p 120.0 1.0'
+        msg = 'p 300.0 1.0'
     else:
         print "WARNING: unknown move command!"
 
@@ -197,7 +203,23 @@ def movecommand (command):
     currentmove = command
 
 def ccw_deg_2_time(theta):
+    return 1.2449 * (theta / 360.0) + 1.0902
+
+def cw_deg_2_time(theta):
     return 1.3423 * (theta / 360.0) + 0.9646
+
+def ccw_time_2_deg(time):
+    return (0.8026 * time - 0.8746) * 360
+
+def cw_time_2_deg(time):
+    return (0.7433 * time - 0.7159) * 360
+
+def foward_cm_2_time(cm):
+    return 0.0291 * cm + 1.2083
+
+def foward_time_2_cm(time):
+    return 34.339 * time - 41.4407
+
 
 def resample(particel_list, sample_random):
     RS_particles = []
