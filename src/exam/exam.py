@@ -280,6 +280,18 @@ def detect_objects():
 
                 # announce that we're clever enough to identify which goal and where it is :)
                 print "Found", goal.getIdentifier(), "at (", goal.getX(), ",", goal.getY(), ")"
+                if goal.getIdentifier() = "L1":
+                    landmark_x = 0
+                    landmark_y = 300
+                elif goal.getIdentifier() = "L2":
+                    landmark_x = 0
+                    landmark_y = 0
+                elif goal.getIdentifier() = "L3":
+                    landmark_x = 400
+                    landmark_y = 300
+                elif goal.getIdentifier() = "L4":
+                    landmark_x = 400
+                    landmark_y = 0
                 break
 
                 # is it the one we want to visit?

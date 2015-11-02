@@ -53,6 +53,7 @@ class Camera(object):
         frame = self.rawCapture
         #frame = self.cam.capture(format="bgr")
         distorted = frame.array
+
         # clear the stream in preparation for the next frame
         self.rawCapture.truncate(0)        
         
