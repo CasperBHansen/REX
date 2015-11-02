@@ -152,12 +152,23 @@ def stop():
     runtime = time.time() - movestarttime
     nextmove = "0"
     waittime = time.time() + 0.8
-    if currentmove == "F":
-        print "F"
-    elif currentmove == "H":
-        print "H"
-    elif currentmove == "L":
-        print "L"
+    if runtime > 1.0:
+        if currentmove == "F":
+            print "F"
+        elif currentmove == "H":
+            distance = ((0.7433 * runtime -0.7159) * 360) * (np.pi/180)
+            for p in particles:
+                theta = p.getTheta()
+                p.setTheta(theta + distance)
+            particle.add_uncertainty(particles, 5, 0.2)
+            print "H"
+        elif currentmove == "L":
+            distance = ((0.7433 * runtime -0.7159) * 360) * (np.pi/180)
+            for p in particles:
+                theta = p.getTheta()
+                p.setTheta(theta - distance)
+            particle.add_uncertainty(particles, 5, 0.2)
+            print "L"
 
 def movecommand (command):
     #sends command to the adrino, saves the current time and command.
@@ -244,9 +255,9 @@ def detect_objects():
                 print "Found landmark 2"
                 landmark_x = 0
                 landmark_y = 0
-            else:
-                print "Unknown landmark type"
-                continue
+        else:
+            print "Unknown landmark type"
+            continue
 
         """ FOR EXAM """
         for goal in goals:
