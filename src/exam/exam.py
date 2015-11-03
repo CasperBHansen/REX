@@ -39,7 +39,7 @@ if DEMO:
 
 movestarttime = 0.0
 currentmove = "0"
-nextmove = "0"
+nextmove = []
 waittime = 0.0
 
 landmark_x = 0
@@ -70,7 +70,7 @@ def draw_world(est_pose, particles, world):
     """Visualization.
     This functions draws robots position in the world."""
     
-    offset = 100;
+    offset = 50;
     
     world[:] = CWHITE # Clear background to white
     
@@ -151,14 +151,14 @@ def gaussian_distribution(x, mu, sigma):
     denote = np.sqrt(Q * np.pi)
     return (np.exp(-(delta*delta) / Q))/denote
 
-def stop():
+def stop(wait):
     # send stop command to the adrino
     # calculate and apply the movemt to the particles
     msg = 's'
     serialRead.write(msg.encode('ascii'))
     runtime = time.time() - movestarttime
-    nextmove = "0"
-    waittime = time.time() + 0.8
+    a = nextmove.pop(0)
+    waittime = time.time() + wait
     if runtime > 1.0:
         if currentmove == "F":
             if runtime < 1.2:
@@ -183,16 +183,14 @@ def stop():
                 p.setTheta(theta - distance)
         add_uncertainty(particles, 5, 0.2)
 
-def movecommand (command):
+def movecommand (command, wait):
     #sends command to the adrino, saves the current time and command.
     if command == "F":
-        msg = 'p 10.5 1.0'
+        msg = 'p 8 1.0'
     elif command == "L":
         msg = 'p 300.0 1.0'
     elif command == "H":
         msg = 'p -310.0 1.0'
-    elif command == "CCW":
-        msg = 'p 300.0 1.0'
     else:
         print "WARNING: unknown move command!"
 
@@ -200,7 +198,9 @@ def movecommand (command):
         serialRead.write(msg.encode('ascii'))
 
     movestarttime = time.time()
+    nextmove.append(0,["S",0.8])
     currentmove = command
+    waittime = time.time() + wait
 
 def ccw_deg_2_time(theta):
     return 1.2449 * (theta / 360.0) + 1.0902
@@ -325,7 +325,7 @@ while len(goals) > 0:
     action = cv2.waitKey(10)
     if action == ord('q'):
 	break
-
+    
     """ EXAM: Robot movement """
     # XXX: Make the robot drive
 
@@ -338,6 +338,12 @@ while len(goals) > 0:
     delta = est_pose.getDeltaForTarget(Particle(0, 0, 90))
 
     # if we have a target
+    if waittime < time.time():
+        continue
+    elif len(nextmove) > 0:
+        movecommand(nextmove[0][0],nextmove[0][1])
+        a = nextmove.pop(0)
+        continue
     if target is not None:
 
         delta = est_pose.getDeltaForTarget(target)
@@ -345,32 +351,51 @@ while len(goals) > 0:
         # if we're within "visiting distance" of the goal
         if delta.getDistance() < 50: # visiting range is < 75cm, so 50cm should be close enough
             print "We've visited ", target.getIdentifier()
-            avoid(goals.pop())
+            avoid.append(goals.pop())
             target = None
         else:
             # if we're looking more or less directly at it
             if np.abs(target.getTheta()) < 0.1:
                 print "Moving toward ", target.getIdentifier()
-                movecommand("F")
+                delta.getDistance - 45
+                movecommand("F", foward_cm_2_time(delta.getDistance - 45)
+                
             # otherwise we can move toward the target
             else:
                 print "Centering ", target.getIdentifier()
-                movecommand("CCW") # begins to rotate counter-clockwise
-                waittime = time.time() + ccw_deg_2_time(delta.getTheta())
+                deg = delta.getTheta()
+                if deg < 0.0:
+                    com = "H"
+                    counter = "L"
+                    time1 = cw_deg_2_time(90)
+                    time3 = cw_deg_2_time(90 + rad_2_deg(np.sqrt(deg*deg)))
+                else:
+                    com = "L"
+                    counter = "H"
+                    time1 = ccw_deg_2_time(90)
+                    time3 = ccw_deg_2_time(90 + rad_2_deg(np.sqrt(deg*deg)))
+                deg = np.sqrt(deg * deg)
+                dx = delta.getDistance() * np.cos(deg)
+                dy = delta.getDistance() * np.sin(deg)
+                time2 = foward_cm_2_time(np.sqrt((dx-delta.getDistance())*(dx-delta.getDistance())+dy*dy))
+                nextmove = [[com, time1],["F",time2],[counter,time3]] + nextmove
+                movecommand("L", ccw_deg_2_time(delta.getTheta())) # begins to rotate counter-clockwise
+                
     else:
         print "Looking for target .."
         # TODO: look for a target, strategy?
         if waittime < time.time():
-            if nextmove == "S":
-                stop()
-                nextmove = "0"
+            if nextmove[0][0] == "S":
+                stop(nextmove[0][1])
+                
             else:
-                movecommand("L")
-                waittime = time.time() + 1.3
-                nextmove = "S"
+                movecommand("L", 1.3)
+                
+                
 
     # Read odometry, see how far we have moved, and update particles.
     # Or use motor controls to update particles
+    '''
     for particle in particles:
         s = np.sin(delta.getTheta())
         c = np.cos(delta.getTheta())
@@ -380,14 +405,14 @@ while len(goals) > 0:
 
         particle.setX((x * c - y * s) - delta.getX())
         particle.setY((x * s + y * c) - delta.getY())
-
+    '''
     if DEMO:
         # Fetch next frame
         colour, distorted = cam.get_colour()    
     
     if waittime < time.time():
-        if nextmove == "S":
-            stop()
+        if nextmove[0][0] == "S":
+            stop(nextmove[0][1])
         else:
             detect_objects()
 
@@ -404,5 +429,5 @@ while len(goals) > 0:
 # TODO: for exam, measure time and do; print "Finished in x seconds!"
 
 # Close all windows
-stop()
+stop(0.0)
 cv2.destroyAllWindows()
