@@ -8,6 +8,7 @@ from particle import Particle, estimate_pose, add_uncertainty
 from landmark import Landmark
 
 DEMO = True
+GUI = False
 
 # Some colors constants
 CRED = (0, 0, 255)
@@ -41,6 +42,8 @@ movestarttime = 0.0
 currentmove = "0"
 nextmove = []
 waittime = 0.0
+trying_to_find = 0
+bubble = 75.0
 
 landmark_x = 0
 landmark_y = 300
@@ -106,7 +109,7 @@ def draw_world(est_pose, particles, world):
 
 ### Main program ###
 
-if DEMO:
+if DEMO and GUI:
     # Open windows
     WIN_RF1 = "Robot view";
     cv2.namedWindow(WIN_RF1);
@@ -151,41 +154,153 @@ def gaussian_distribution(x, mu, sigma):
     denote = np.sqrt(Q * np.pi)
     return (np.exp(-(delta*delta) / Q))/denote
 
+def checkpath(offroad, drivetime):
+    global est_pose
+    global bubble
+
+    travel = forward_time_2_cm(drivetime)
+    travel_frags = travel * 3.0
+    ownx = est_pose.getX()
+    owny = est_pose.getY()
+    owntheta = est_pose.getTheta() + offroad
+    badpath = False
+    for i in range(int(travel_frags)):
+        distance = (i * 3)
+        dx = ownx + np.cos(owntheta) * distance
+        dy = owny + -np.sin(owntheta) * distance
+        for obstical in avoid:
+            
+            minx = minimum(dx, obstical.getUX()) 
+            miny = minimum(dy, obstical.getUY())
+            maxx = maximum(dx, obstical.getUX())
+            maxy = maximum(dy, obstical.getUY())
+            a = maxx - minx
+            b = maxy - miny
+            c = np.sqrt(a * a + b * b)
+            if c < bubble:
+                badpath = True
+                break
+        if badpath:
+            break
+    return not badpath
+
+def inside_bubble():
+    global est_pose
+    ownx = est_pose.getX()
+    owny = est_pose.getY()
+    inabubble = False
+    for obstical in avoid:
+        
+        minx = minimum(ownx, obstical.getUX()) 
+        miny = minimum(owny, obstical.getUY())
+        maxx = maximum(ownx, obstical.getUX())
+        maxy = maximum(owny, obstical.getUY())
+        a = maxx - minx
+        b = maxy - miny
+        c = np.sqrt(a * a + b * b)
+        if c < bubble:
+            inabubble = True
+            break
+    return inabubble
 def stop(wait):
+    global nextmove
+    global currentmove
+    global est_pose
+
     # send stop command to the adrino
     # calculate and apply the movemt to the particles
     msg = 's'
     serialRead.write(msg.encode('ascii'))
     runtime = time.time() - movestarttime
-    a = nextmove.pop(0)
+
     waittime = time.time() + wait
     if runtime > 1.0:
         if currentmove == "F":
             if runtime < 1.2:
                 distance = 0
             else:
-                distance = foward_time_2_cm(runtime)
+
+                distance = forward_time_2_cm(runtime)
+
                 for p in particles:
                     x = p.getX() + (np.cos(p.getTheta()) * distance)
-                    y = p.getY() + (np.sin(p.getTheta()) * distance)
+                    y = p.getY() + ((-np.sin(p.getTheta())) * distance)
                     p.setX(x)
                     p.setY(y)
-
+                add_uncertainty(particles, 5, 0.2)
         elif currentmove == "H":
             distance = cw_time_2_deg(runtime) * (np.pi/180)
             for p in particles:
                 theta = p.getTheta()
-                p.setTheta(theta + distance)
+                p.setTheta(theta - distance)
+            add_uncertainty(particles, 1, 0.2)
         elif currentmove == "L":
             distance = ccw_time_2_deg(runtime) * (np.pi/180)
             for p in particles:
                 theta = p.getTheta()
-                p.setTheta(theta - distance)
-        add_uncertainty(particles, 5, 0.2)
+                p.setTheta(theta + distance)
+            add_uncertainty(particles, 1, 0.2)
+    
+    currentmove = "0"
+    est_pose = estimate_pose(particles)
 
 def movecommand (command, wait):
+    global nextmove
+    global waittime
+    global currentmove
+    global movestarttime
+    
+    emergency = False
     #sends command to the adrino, saves the current time and command.
     if command == "F":
+        msg = 'r1\n'
+        serialRead.write(msg.encode('ascii'))
+        front = serialRead.readline()
+        print "infrared sensor read: ", front
+        front_val = float(front)
+        if front_val > 10.0 and front_val < 80:
+            est_pose = est_pose = estimate_pose(particles)
+            a = np.cos(est_pose.getTheta()) * front_val + est_pose.getX()
+            b = -np.sin(est_pose.getTheta()) * front_val + est_pose.getY()
+            too_close = False
+            for goal in goals:
+                minx = minimum(a, goal.getUX()) 
+                miny = minimum(b, goal.getUY())
+                maxx = maximum(a, goal.getUX())
+                maxy = maximum(b, goal.getUY())
+
+                da = maxx - minx
+                db = maxy - miny
+                dc = np.sqrt(a * a + b * b)
+                if dc < 75:
+                    too_close = True
+                    break
+
+            if not too_close:
+		avoid.append(Landmark("box", (a,b), GREEN, "irrelvant"))
+        if not checkpath(0.0, wait):
+            notrouble = False
+            if inside_bubble:
+               msg = 'p 8 1.0'
+            else:
+               offroad = 0
+               while not notrouble and offroad < 4:
+                   if offroad < 0:
+                       offroad = (-offroad) + 1
+                   else:
+                       offroad = -offroad
+                   notrouble = checkpath(offroad,wait)
+            if notrouble:
+               if offroad < 0:
+                   turn = "H"
+                   turnlength = cw_deg_2_time(rad_2_deg(offroad))
+               else:
+                   turn = "L"
+                   turnlength = ccw_deg_2_time(rad_2_deg(offroad))
+               nextmove = [[turn, turnlength],["F",wait]]
+               emergency = True
+            else:
+               msg = 'p 8.0 1.0'
         msg = 'p 8 1.0'
     elif command == "L":
         msg = 'p 300.0 1.0'
@@ -193,14 +308,45 @@ def movecommand (command, wait):
         msg = 'p -310.0 1.0'
     else:
         print "WARNING: unknown move command!"
+    if not emergency: 
+        if DEMO:
+            serialRead.write(msg.encode('ascii'))
 
-    if DEMO:
-        serialRead.write(msg.encode('ascii'))
+        movestarttime = time.time()
 
-    movestarttime = time.time()
-    nextmove.append(0,["S",0.8])
-    currentmove = command
-    waittime = time.time() + wait
+        if len(nextmove) == 0:
+            nextmove = [["S", 0.3]]
+        else:
+            nextmove.pop(0)
+            nextmove.insert(0, ["S", 0.3])
+
+        currentmove = command
+        waittime = time.time() + wait
+
+def minimum(a,b):
+    if a < b:
+        return a
+    return b
+
+def maximum(a,b):
+    if a > b:
+        return a
+    return b
+
+def getDeltaFromBot(goal):
+    global est_pose
+    minx = minimum(est_pose.getX(), goal.getUX()) 
+    miny = minimum(est_pose.getY(), goal.getUY())
+    maxx = maximum(est_pose.getX(), goal.getUX())
+    maxy = maximum(est_pose.getY(), goal.getUY())
+
+    a = maxx - minx
+    b = maxy - miny
+    c = np.sqrt(a * a + b * b)
+    
+    theta = np.arccos(a/c)
+    
+    return (c, theta)
 
 def ccw_deg_2_time(theta):
     return 1.2449 * (theta / 360.0) + 1.0902
@@ -214,10 +360,10 @@ def ccw_time_2_deg(time):
 def cw_time_2_deg(time):
     return (0.7433 * time - 0.7159) * 360
 
-def foward_cm_2_time(cm):
+def forward_cm_2_time(cm):
     return 0.0291 * cm + 1.2083
 
-def foward_time_2_cm(time):
+def forward_time_2_cm(time):
     return 34.339 * time - 41.4407
 
 
@@ -265,16 +411,14 @@ def detect_objects():
                 
                 # calculate position of the goal
                 x = np.cos(measured_angle) * measured_distance
-                y = np.sin(measured_angle) * measured_distance
-
+                y = -np.sin(measured_angle) * measured_distance
+                print measured_distance
                 # set its position
                 goal.setPosition(x, y)
                 goal.setTheta(measured_angle)
 
                 # announce that we're clever enough to identify which goal and where it is :)
                 print "Found", goal.getIdentifier(), "at (", goal.getX(), ",", goal.getY(), "), theta: ", goal.getTheta()
-                goals = []
-                return
 
                 landmark_x = goal.getUX()
                 landmark_y = goal.getUY()
@@ -324,99 +468,94 @@ while len(goals) > 0:
 
     action = cv2.waitKey(10)
     if action == ord('q'):
-	break
-    
+        break
     """ EXAM: Robot movement """
     # XXX: Make the robot drive
-
-    # print "ROBOT ESTIMATION"
-    # print "X: ", est_pose.getX()
-    # print "Y: ", est_pose.getY()
-    # print "Theta: ", est_pose.getTheta()
 
     # fallback when we have no target, it will try to go/rotate there
     delta = est_pose.getDeltaForTarget(Particle(0, 0, 90))
 
-    # if we have a target
-    if waittime < time.time():
+    # executing move orders
+    if waittime > time.time():
+        if currentmove == "F":
+            msg = 'r1\n'
+            serialRead.write(msg.encode('ascii'))
+            front_val = float(serialRead.readline())
+            if front_val < 30.0:
+                stop(0.3)
+                nextmove = [["L", ccw_deg_2_time(90)],["F", forward_cm_2_time(50)],["H", cw_deg_2_time(90)]]
+            
         continue
     elif len(nextmove) > 0:
-        movecommand(nextmove[0][0],nextmove[0][1])
-        a = nextmove.pop(0)
+        if nextmove[0][0] == "S":
+            stop(nextmove[0][1])
+            nextmove.pop(0)
+            print "list after stop:", nextmove
+        else:
+            movecommand(nextmove[0][0],nextmove[0][1])
+            print "list after move:", nextmove
         continue
+
+    pic_taken = 0
+    while target == None and pic_taken < 3: 
+        if DEMO:
+            # Fetch next frame
+            colour, distorted = cam.get_colour()    
+    
+        detect_objects()
+        pic_taken += 1
+
+    # if we have a target
     if target is not None:
-
+        trying_to_find = 0
         delta = est_pose.getDeltaForTarget(target)
-
+        print "Landmark is: ", target.getIdentifier()
+        print "distance: ", target.getDistance()
+        print "angle in deg: ", deg_2_rad(target.getTheta())
+        
         # if we're within "visiting distance" of the goal
-        if delta.getDistance() < 50: # visiting range is < 75cm, so 50cm should be close enough
+        if target.getDistance() < 60: # visiting range is < 75cm, so 60cm should be close enough
             print "We've visited ", target.getIdentifier()
-            avoid.append(goals.pop())
+            avoid.append(goals.pop(0))
             target = None
         else:
             # if we're looking more or less directly at it
-            if np.abs(target.getTheta()) < 0.1:
-                print "Moving toward ", target.getIdentifier()
-                delta.getDistance - 45
-                movecommand("F", foward_cm_2_time(delta.getDistance - 45)
+            
+            print "Moving toward ", target.getIdentifier()
+            d = target.getDistance() - 45.0
+            if d > 75.0:
+                d = 75.0
+            nextmove.append(["F", forward_cm_2_time(d)])
+
                 
             # otherwise we can move toward the target
-            else:
-                print "Centering ", target.getIdentifier()
-                deg = delta.getTheta()
-                if deg < 0.0:
-                    com = "H"
-                    counter = "L"
-                    time1 = cw_deg_2_time(90)
-                    time3 = cw_deg_2_time(90 + rad_2_deg(np.sqrt(deg*deg)))
-                else:
-                    com = "L"
-                    counter = "H"
-                    time1 = ccw_deg_2_time(90)
-                    time3 = ccw_deg_2_time(90 + rad_2_deg(np.sqrt(deg*deg)))
-                deg = np.sqrt(deg * deg)
-                dx = delta.getDistance() * np.cos(deg)
-                dy = delta.getDistance() * np.sin(deg)
-                time2 = foward_cm_2_time(np.sqrt((dx-delta.getDistance())*(dx-delta.getDistance())+dy*dy))
-                nextmove = [[com, time1],["F",time2],[counter,time3]] + nextmove
-                movecommand("L", ccw_deg_2_time(delta.getTheta())) # begins to rotate counter-clockwise
-                
+        target = None
+        
     else:
         print "Looking for target .."
-        # TODO: look for a target, strategy?
-        if waittime < time.time():
-            if nextmove[0][0] == "S":
-                stop(nextmove[0][1])
-                
-            else:
-                movecommand("L", 1.3)
-                
-                
-
-    # Read odometry, see how far we have moved, and update particles.
-    # Or use motor controls to update particles
-    '''
-    for particle in particles:
-        s = np.sin(delta.getTheta())
-        c = np.cos(delta.getTheta())
-        
-        x = particle.getX()
-        y = particle.getY()
-
-        particle.setX((x * c - y * s) - delta.getX())
-        particle.setY((x * s + y * c) - delta.getY())
-    '''
-    if DEMO:
-        # Fetch next frame
-        colour, distorted = cam.get_colour()    
-    
-    if waittime < time.time():
-        if nextmove[0][0] == "S":
-            stop(nextmove[0][1])
+        # look for a target subroutine take picture 3 times, if no landmark is found, turn and try again. 
+        if trying_to_find < 8:
+            nextmove.append(["L", ccw_deg_2_time(45)])
+            trying_to_find += 1
         else:
-            detect_objects()
+            # can't find by rotatting time to guess based on there we are
+            trying_to_find = 0
+            est_pose = estimate_pose(particles)
+            targ = goals[0]
+            length, theta =  getDeltaFromBot(targ)
+            if length > 75.0:
+                length = 75.0
+            
+            if theta < 0:
+                direction = "H"
+                dirlength = cw_deg_2_time(rad_2_deg(theta))
+            else:
+                direction = "L"
+                dirlength = cw_deg_2_time(rad_2_deg(theta))
+            nextmove = [[direction, dirlength],["F",forward_cm_2_time(length)]]
+            print "estimated theta: ", theta
 
-    if DEMO:
+    if DEMO and GUI:
         # Draw map
         draw_world(est_pose, particles, world)
         
@@ -430,4 +569,6 @@ while len(goals) > 0:
 
 # Close all windows
 stop(0.0)
-cv2.destroyAllWindows()
+
+if GUI:
+    cv2.destroyAllWindows()
